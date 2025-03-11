@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Our Family Calendar</title>
+    <title>MattaMarzani Family Calendar</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,11 +32,29 @@
             font-size: 1.2em;
             margin-bottom: 5px;
         }
-        .current-time {
-            text-align: center;
-            color: #666;
-            font-size: 1em;
+        .time-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
             margin-bottom: 20px;
+        }
+        .time-box {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 8px 12px;
+            text-align: center;
+            min-width: 150px;
+        }
+        .time-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
+        .time-value {
+            font-size: 1em;
+            color: #333;
         }
         .event {
             background-color: #f0f8ff;
@@ -117,13 +135,22 @@
         <a href="/logout" class="logout-button">Logout</a>
         <h1>Our Family Calendar</h1>
         <div class="today" id="current-date">Today's Date</div>
-        <div class="current-time" id="current-time">Current Time</div>
+        <div class="time-container">
+            <div class="time-box">
+                <div class="time-label">SFO</div>
+                <div class="time-value" id="sfo-time">Loading...</div>
+            </div>
+            <div class="time-box">
+                <div class="time-label">BLQ</div>
+                <div class="time-value" id="blq-time">Loading...</div>
+            </div>
+        </div>
         <div id="events">Loading events...</div>
         <div id="auth-container"></div>
     </div>
 
     <script>
-        // Update the date and time
+        // Update the date and time zones
         function updateDateTime() {
             const now = new Date();
             
@@ -137,15 +164,23 @@
             document.getElementById('current-date').textContent = 
                 now.toLocaleDateString('en-US', dateOptions);
             
-            // Update time
+            // Time formatting options
             const timeOptions = {
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: true
             };
-            document.getElementById('current-time').textContent = 
-                now.toLocaleTimeString('en-US', timeOptions);
+                       
+            // Update San Francisco time (PST/PDT)
+            const sfoTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+            document.getElementById('sfo-time').textContent = 
+                sfoTime.toLocaleTimeString('en-US', timeOptions);
+            
+            // Update Bologna time (CET/CEST)
+            const blqTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Rome' }));
+            document.getElementById('blq-time').textContent = 
+                blqTime.toLocaleTimeString('en-US', timeOptions);
         }
         
         // Fetch today's events
@@ -262,4 +297,4 @@
         setInterval(fetchEvents, 5 * 60 * 1000);
     </script>
 </body>
-</html>
+</html> 
