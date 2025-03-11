@@ -20,6 +20,7 @@
             padding: 20px;
             width: 90%;
             max-width: 600px;
+            position: relative;
         }
         h1 {
             text-align: center;
@@ -29,6 +30,12 @@
             text-align: center;
             color: #4285f4;
             font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+        .current-time {
+            text-align: center;
+            color: #666;
+            font-size: 1em;
             margin-bottom: 20px;
         }
         .event {
@@ -36,6 +43,10 @@
             border-radius: 5px;
             padding: 15px;
             margin-bottom: 15px;
+        }
+        .event.past-event {
+            background-color: #f5f5f5;
+            color: #888;
         }
         .event-header {
             font-size: 1.1em;
@@ -46,9 +57,15 @@
             color: #4285f4;
             margin-bottom: 5px;
         }
+        .past-event .event-time {
+            color: #888;
+        }
         .event-location {
             color: #666;
             margin-bottom: 5px;
+        }
+        .past-event .event-location {
+            color: #888;
         }
         .event-travel {
             color: #34a853;
@@ -77,28 +94,58 @@
         #auth-button:hover {
             background-color: #3367d6;
         }
+        .logout-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .logout-button:hover {
+            background-color: #e5e5e5;
+        }
     </style>
 </head>
 <body>
     <div class="calendar-container">
+        <a href="/logout" class="logout-button">Logout</a>
         <h1>Our Family Calendar</h1>
         <div class="today" id="current-date">Today's Date</div>
+        <div class="current-time" id="current-time">Current Time</div>
         <div id="events">Loading events...</div>
         <div id="auth-container"></div>
     </div>
 
     <script>
-        // Update the date
-        function updateDate() {
+        // Update the date and time
+        function updateDateTime() {
             const now = new Date();
-            const options = { 
+            
+            // Update date
+            const dateOptions = { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
                 day: 'numeric' 
             };
             document.getElementById('current-date').textContent = 
-                now.toLocaleDateString('en-US', options);
+                now.toLocaleDateString('en-US', dateOptions);
+            
+            // Update time
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            document.getElementById('current-time').textContent = 
+                now.toLocaleTimeString('en-US', timeOptions);
         }
         
         // Fetch today's events
@@ -119,28 +166,35 @@
                 }
                 
                 eventsDiv.innerHTML = '';
+                const now = new Date();
+                
                 events.forEach(event => {
                     const startTime = new Date(event.start);
                     const endTime = new Date(event.end);
+                    const isPastEvent = endTime < now;
                     
-                    // Calculate if we should leave soon (if travel time is available)
+                    // Calculate if we should leave soon (if travel time is available and event is not in the past)
                     let shouldLeaveSoon = false;
-                    if (event.travelTime) {
+                    if (event.travelTime && !isPastEvent) {
                         const travelMinutes = parseInt(event.travelTime.duration.split(' ')[0]);
-                        const timeUntilStart = (startTime - new Date()) / (1000 * 60);
-                        shouldLeaveSoon = timeUntilStart <= (travelMinutes + 15); // 15 minutes buffer
+                        const timeUntilStart = (startTime - now) / (1000 * 60);
+                        shouldLeaveSoon = timeUntilStart <= (travelMinutes + 15) && timeUntilStart > 0; // 15 minutes buffer and only if event is in the future
                     }
                     
                     const eventElement = document.createElement('div');
-                    eventElement.className = 'event';
-                    eventElement.innerHTML = `
+                    eventElement.className = isPastEvent ? 'event past-event' : 'event';
+                    
+                    let eventHTML = `
                         <div class="event-header">${event.summary}</div>
                         <div class="event-time">
                             ${event.displayTime} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             <span class="event-duration">(${event.duration})</span>
                         </div>
-                        <div class="event-location">📍 ${event.location}</div>
-                        ${event.travelTime ? `
+                        <div class="event-location">📍 ${event.location}</div>`;
+                    
+                    // Only show travel time for future events
+                    if (event.travelTime && !isPastEvent) {
+                        eventHTML += `
                             <div class="event-travel">
                                 🚗 ${event.travelTime.distance} away
                                 (${event.travelTime.durationInTraffic || event.travelTime.duration} by car)
@@ -149,12 +203,14 @@
                                 <div class="warning">
                                     ⚠️ Time to leave soon!
                                 </div>
-                            ` : ''}
-                        ` : ''}
-                        ${event.description ? `
-                            <div class="event-description">${event.description}</div>
-                        ` : ''}
-                    `;
+                            ` : ''}`;
+                    }
+                    
+                    if (event.description) {
+                        eventHTML += `<div class="event-description">${event.description}</div>`;
+                    }
+                    
+                    eventElement.innerHTML = eventHTML;
                     eventsDiv.appendChild(eventElement);
                 });
             } catch (error) {
@@ -196,9 +252,14 @@
         }
         
         // Initialize
-        updateDate();
+        updateDateTime();
         fetchEvents();
-        setInterval(fetchEvents, 5 * 60 * 1000); // Refresh every 5 minutes
+        
+        // Update time every second
+        setInterval(updateDateTime, 1000);
+        
+        // Refresh events every 5 minutes
+        setInterval(fetchEvents, 5 * 60 * 1000);
     </script>
 </body>
 </html>

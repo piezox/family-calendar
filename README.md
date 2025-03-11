@@ -17,7 +17,7 @@ A simple calendar application that integrates with Google Calendar API to displa
 
 1. **Install dependencies**:
    ```
-   cd family-calendar-server
+   cd family-calendar
    npm install
    ```
 

@@ -4,6 +4,7 @@ const { OAuth2Client } = require('google-auth-library');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
@@ -12,7 +13,36 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'family-calendar-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Password protection middleware
+const passwordProtect = (req, res, next) => {
+  // Skip authentication for login page and login POST request
+  if (req.path === '/login' || req.path === '/auth/login') {
+    return next();
+  }
+  
+  // Check if user is authenticated
+  if (req.session.authenticated) {
+    return next();
+  }
+  
+  // Redirect to login page
+  res.redirect('/login');
+};
+
+// Apply password protection to all routes except static files
 app.use(express.static('public'));
+app.use(passwordProtect);
 
 // OAuth2 setup
 const oauth2Client = new OAuth2Client(
@@ -49,6 +79,27 @@ try {
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
 // Routes
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/auth/login', (req, res) => {
+  const { password } = req.body;
+  const correctPassword = process.env.APP_PASSWORD || 'family';
+  
+  if (password === correctPassword) {
+    req.session.authenticated = true;
+    res.redirect('/');
+  } else {
+    res.redirect('/login?error=1');
+  }
+});
+
+app.get('/logout', (req, res) => {
+  req.session.authenticated = false;
+  res.redirect('/login');
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
