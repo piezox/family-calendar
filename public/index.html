@@ -13,18 +13,42 @@
             min-height: 100vh;
             background-color: #f5f5f5;
         }
+        .main-container {
+            display: flex;
+            width: 95%;
+            max-width: 1200px;
+            gap: 20px;
+        }
         .calendar-container {
             background-color: white;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             padding: 20px;
-            width: 90%;
-            max-width: 600px;
+            width: 50%;
             position: relative;
+        }
+        .right-container {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .right-panel {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            flex: 1;
         }
         h1 {
             text-align: center;
             color: #333;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #4285f4;
         }
         .today {
             text-align: center;
@@ -112,6 +136,19 @@
         #auth-button:hover {
             background-color: #3367d6;
         }
+        .section-title {
+            font-size: 1.2em;
+            color: #333;
+            margin: 20px 0 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #4285f4;
+        }
+        .upcoming-date {
+            font-weight: bold;
+            color: #4285f4;
+            margin-top: 15px;
+            margin-bottom: 10px;
+        }
         .logout-button {
             position: absolute;
             top: 10px;
@@ -128,25 +165,58 @@
         .logout-button:hover {
             background-color: #e5e5e5;
         }
+        .todo-placeholder {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 1.2em;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .calendar-container, .right-container {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="calendar-container">
-        <a href="/logout" class="logout-button">Logout</a>
-        <h1>Our Family Calendar</h1>
-        <div class="today" id="current-date">Today's Date</div>
-        <div class="time-container">
-            <div class="time-box">
-                <div class="time-label">SFO</div>
-                <div class="time-value" id="sfo-time">Loading...</div>
+    <div class="main-container">
+        <div class="calendar-container">
+            <a href="/logout" class="logout-button">Logout</a>
+            <h1>Our Family Calendar</h1>
+            <div class="today" id="current-date">Today's Date</div>
+            <div class="time-container">
+                <div class="time-box">
+                    <div class="time-label">SFO</div>
+                    <div class="time-value" id="sfo-time">Loading...</div>
+                </div>
+                <div class="time-box">
+                    <div class="time-label">BLQ</div>
+                    <div class="time-value" id="blq-time">Loading...</div>
+                </div>
             </div>
-            <div class="time-box">
-                <div class="time-label">BLQ</div>
-                <div class="time-value" id="blq-time">Loading...</div>
+            <div class="section-title">Today's Events</div>
+            <div id="events">Loading events...</div>
+            <div class="section-title">Upcoming Events (Next 7 Days)</div>
+            <div id="upcoming-events">Loading upcoming events...</div>
+            <div id="auth-container"></div>
+        </div>
+        
+        <div class="right-container">
+            <div class="right-panel">
+                <h2>Family AI Assistant</h2>
+                <div class="todo-placeholder">TODO</div>
+            </div>
+            <div class="right-panel">
+                <h2>Digital Wellbeing</h2>
+                <div class="todo-placeholder">TODO</div>
             </div>
         </div>
-        <div id="events">Loading events...</div>
-        <div id="auth-container"></div>
     </div>
 
     <script>
@@ -213,7 +283,7 @@
                     if (event.travelTime && !isPastEvent) {
                         const travelMinutes = parseInt(event.travelTime.duration.split(' ')[0]);
                         const timeUntilStart = (startTime - now) / (1000 * 60);
-                        shouldLeaveSoon = timeUntilStart <= (travelMinutes + 15) && timeUntilStart > 0; // 15 minutes buffer and only if event is in the future
+                        shouldLeaveSoon = timeUntilStart <= (travelMinutes + 15) && timeUntilStart > 0;
                     }
                     
                     const eventElement = document.createElement('div');
@@ -227,7 +297,6 @@
                         </div>
                         <div class="event-location">📍 ${event.location}</div>`;
                     
-                    // Only show travel time for future events
                     if (event.travelTime && !isPastEvent) {
                         eventHTML += `
                             <div class="event-travel">
@@ -252,6 +321,64 @@
                 console.error('Error:', error);
                 document.getElementById('events').innerHTML = 
                     '<p>Error loading events. Please try again.</p>';
+                checkAuthStatus();
+            }
+        }
+
+        // Fetch upcoming events
+        async function fetchUpcomingEvents() {
+            try {
+                const response = await fetch('/api/events/upcoming');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch upcoming events');
+                }
+                
+                const events = await response.json();
+                const upcomingEventsDiv = document.getElementById('upcoming-events');
+                
+                if (events.length === 0) {
+                    upcomingEventsDiv.innerHTML = '<p>No upcoming events in the next week.</p>';
+                    return;
+                }
+                
+                upcomingEventsDiv.innerHTML = '';
+                let currentDate = '';
+                
+                events.forEach(event => {
+                    if (event.displayDate !== currentDate) {
+                        currentDate = event.displayDate;
+                        const dateDiv = document.createElement('div');
+                        dateDiv.className = 'upcoming-date';
+                        dateDiv.textContent = currentDate;
+                        upcomingEventsDiv.appendChild(dateDiv);
+                    }
+                    
+                    const eventElement = document.createElement('div');
+                    eventElement.className = 'event';
+                    
+                    let eventHTML = `
+                        <div class="event-header">${event.summary}</div>
+                        <div class="event-time">
+                            ${event.displayTime} - ${new Date(event.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            <span class="event-duration">(${event.duration})</span>
+                        </div>`;
+                    
+                    if (event.location && event.location !== 'No location specified') {
+                        eventHTML += `<div class="event-location">📍 ${event.location}</div>`;
+                    }
+                    
+                    if (event.description) {
+                        eventHTML += `<div class="event-description">${event.description}</div>`;
+                    }
+                    
+                    eventElement.innerHTML = eventHTML;
+                    upcomingEventsDiv.appendChild(eventElement);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('upcoming-events').innerHTML = 
+                    '<p>Error loading upcoming events. Please try again.</p>';
                 checkAuthStatus();
             }
         }
@@ -289,12 +416,16 @@
         // Initialize
         updateDateTime();
         fetchEvents();
+        fetchUpcomingEvents();
         
         // Update time every second
         setInterval(updateDateTime, 1000);
         
         // Refresh events every 5 minutes
-        setInterval(fetchEvents, 5 * 60 * 1000);
+        setInterval(() => {
+            fetchEvents();
+            fetchUpcomingEvents();
+        }, 5 * 60 * 1000);
     </script>
 </body>
 </html> 

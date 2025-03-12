@@ -256,6 +256,77 @@ app.get('/api/events/today', async (req, res) => {
   }
 });
 
+app.get('/api/events/upcoming', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const oneWeekFromTomorrow = new Date(tomorrow);
+    oneWeekFromTomorrow.setDate(oneWeekFromTomorrow.getDate() + 7);
+    
+    const response = await calendar.events.list({
+      calendarId: process.env.CALENDAR_ID,
+      timeMin: tomorrow.toISOString(),
+      timeMax: oneWeekFromTomorrow.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+    
+    // Process each event to add duration and travel time
+    const eventsWithDetails = await Promise.all(response.data.items.map(async event => {
+      const start = new Date(event.start.dateTime || event.start.date);
+      const end = new Date(event.end.dateTime || event.end.date);
+      const duration = (end - start) / (1000 * 60); // Duration in minutes
+
+      let travelTime = null;
+      if (event.location) {
+        // Use our simple estimation instead of API call
+        travelTime = estimateTravelTime(event.location);
+      }
+
+      return {
+        summary: event.summary,
+        start: start,
+        end: end,
+        displayTime: start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        displayDate: start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        duration: `${duration} minutes`,
+        location: event.location || 'No location specified',
+        travelTime,
+        description: event.description || ''
+      };
+    }));
+    
+    res.json(eventsWithDetails);
+  } catch (error) {
+    console.error('Error fetching upcoming events', error);
+    
+    // Handle token expiration
+    if (error.response && error.response.status === 401) {
+      // Try to refresh the token
+      try {
+        const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH));
+        if (tokens.refresh_token) {
+          oauth2Client.setCredentials({
+            refresh_token: tokens.refresh_token
+          });
+          await oauth2Client.refreshAccessToken();
+          // Retry the request
+          return res.redirect('/api/events/upcoming');
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing token', refreshError);
+        tokenExists = false;
+      }
+    }
+    
+    res.status(500).json({ error: 'Failed to fetch upcoming events' });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
