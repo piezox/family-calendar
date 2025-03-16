@@ -42,15 +42,16 @@ A simple calendar application that integrates with Google Calendar API to displa
 4. **Access the application**:
    Open http://localhost:3000 in your browser
 
-## Simplified Deployment to AWS Lightsail with Bitnami Node.js
+## Deployment to Raspberry Pi
 
-Since you already have familycal.piezo.cc associated with your Lightsail instance, here's a simplified deployment process:
+This project uses GitHub for source code management and includes scripts to automate the deployment process to a Raspberry Pi.
 
 ### 1. Push Your Code to GitHub
 
+First, create a GitHub repository and push your code:
+
 ```bash
 # Initialize Git repository (if not already done)
-cd family-calendar-server
 git init
 
 # Add all files
@@ -66,124 +67,107 @@ git remote add origin https://github.com/yourusername/family-calendar.git
 git push -u origin main
 ```
 
-### 2. Set Up on Your Lightsail Instance
+### 2. Set Up Your Raspberry Pi
 
-Connect to your Lightsail instance via SSH and run:
+1. **Set up SSH access** to your Raspberry Pi from your Mac
+2. **Transfer the setup script** to your Raspberry Pi:
+   ```bash
+   scp pi-setup.sh pi@raspberrypi.local:~/
+   ```
+
+3. **Run the setup script** on your Raspberry Pi:
+   ```bash
+   ssh pi@raspberrypi.local "chmod +x ~/pi-setup.sh && ~/pi-setup.sh"
+   ```
+
+   This will:
+   - Install Node.js 20.x
+   - Install Git and PM2
+   - Set up Nginx as a reverse proxy with proper configuration
+   - Configure the application to start on boot
+
+### 3. Deploy Your Application
+
+#### Option 1: Manual Deployment
+
+1. **Transfer the deployment script** to your Raspberry Pi:
+   ```bash
+   scp deploy-from-github.sh pi@raspberrypi.local:~/
+   ```
+
+2. **Update the GitHub repository URL** in the deployment script:
+   ```bash
+   ssh pi@raspberrypi.local "sed -i 's|https://github.com/yourusername/family-calendar.git|https://github.com/YOUR_ACTUAL_USERNAME/family-calendar.git|g' ~/deploy-from-github.sh"
+   ```
+
+3. **Run the deployment script** on your Raspberry Pi:
+   ```bash
+   ssh pi@raspberrypi.local "chmod +x ~/deploy-from-github.sh && ~/deploy-from-github.sh"
+   ```
+
+#### Option 2: Automatic Deployment with GitHub Webhooks
+
+1. **Transfer the webhook setup script** to your Raspberry Pi:
+   ```bash
+   scp setup-webhook.sh pi@raspberrypi.local:~/
+   ```
+
+2. **Run the webhook setup script** on your Raspberry Pi:
+   ```bash
+   ssh pi@raspberrypi.local "chmod +x ~/setup-webhook.sh && ~/setup-webhook.sh"
+   ```
+
+3. **Configure the GitHub webhook** using the information provided by the script
+
+### 4. Set Up Environment Variables
+
+SSH into your Raspberry Pi and create a `.env` file:
 
 ```bash
-# Create projects directory
-sudo mkdir -p /opt/bitnami/projects
-sudo chown $USER /opt/bitnami/projects
-cd /opt/bitnami/projects
+ssh pi@raspberrypi.local
+cd ~/family-calendar
+nano .env
+```
 
-# Clone your repository
-git clone https://github.com/yourusername/family-calendar.git
-cd family-calendar
+Add your environment variables:
 
-# Create .env file
-cat > .env << EOF
+```
 PORT=3000
 CLIENT_ID=your_client_id_here
 CLIENT_SECRET=your_client_secret_here
-REDIRECT_URI=https://familycal.piezo.cc/auth/callback
+REDIRECT_URI=http://raspberrypi.local/auth/callback
 CALENDAR_ID=your_calendar_id_here
 NODE_ENV=production
-EOF
-
-# Install dependencies
-npm install
-
-# Install Forever and start your app
-sudo npm install -g forever
-forever start server.js
 ```
 
-### 3. Configure Apache Virtual Host for familycal.piezo.cc
+### 5. Access Your Application
 
-```bash
-# Create HTTP virtual host
-sudo nano /opt/bitnami/apache/conf/vhosts/familycal-http-vhost.conf
-```
+You can now access your application at:
+- `http://raspberrypi.local` (if your Pi's hostname is "raspberrypi")
+- `http://your-raspberry-pi-ip` (using the Pi's IP address)
 
-Add the following content:
-```
-<VirtualHost *:80>
-  ServerName familycal.piezo.cc
-  DocumentRoot "/opt/bitnami/projects/family-calendar/public"
-  <Directory "/opt/bitnami/projects/family-calendar/public">
-    Require all granted
-  </Directory>
-  ProxyPass / http://localhost:3000/
-  ProxyPassReverse / http://localhost:3000/
-</VirtualHost>
-```
+### 6. Update Your Application
 
-```bash
-# Create HTTPS virtual host
-sudo nano /opt/bitnami/apache/conf/vhosts/familycal-https-vhost.conf
-```
+With the GitHub-based deployment:
 
-Add the following content:
-```
-<VirtualHost *:443>
-  ServerName familycal.piezo.cc
-  SSLEngine on
-  SSLCertificateFile "/opt/bitnami/apache/conf/bitnami/certs/server.crt"
-  SSLCertificateKeyFile "/opt/bitnami/apache/conf/bitnami/certs/server.key"
-  DocumentRoot "/opt/bitnami/projects/family-calendar/public"
-  <Directory "/opt/bitnami/projects/family-calendar/public">
-    Require all granted
-  </Directory>
-  ProxyPass / http://localhost:3000/
-  ProxyPassReverse / http://localhost:3000/
-</VirtualHost>
-```
-
-### 4. Set Up HTTPS and Restart Apache
-
-```bash
-# Configure Let's Encrypt certificate
-sudo /opt/bitnami/bncert-tool
-# Follow the prompts, entering familycal.piezo.cc when asked for domains
-
-# Restart Apache
-sudo /opt/bitnami/ctlscript.sh restart apache
-```
-
-### 5. Set Up Authentication
-
-1. Visit https://familycal.piezo.cc in your browser
-2. Click the "Authenticate" button and follow the Google OAuth flow
-3. After authentication, you'll see a message with a TOKEN_DATA value
-4. Update your .env file with this value:
-   ```bash
-   nano /opt/bitnami/projects/family-calendar/.env
-   # Add: TOKEN_DATA=the_token_value_from_the_message
-   ```
-5. Restart your application: `forever restart server.js`
-
-### 6. Update Your Application (When Needed)
-
-When you make changes to your code:
-
-1. Push changes to GitHub:
+1. Make changes to your code locally
+2. Commit and push to GitHub:
    ```bash
    git add .
    git commit -m "Your update message"
    git push
    ```
 
-2. Pull changes on your server:
+3. If you set up the webhook, the application will deploy automatically
+4. If not, run the deployment script on your Raspberry Pi:
    ```bash
-   cd /opt/bitnami/projects/family-calendar
-   git pull
-   npm install  # If dependencies changed
-   forever restart server.js
+   ssh pi@raspberrypi.local "~/deploy-from-github.sh"
    ```
 
 ### Useful Commands
 
-- **View running processes**: `forever list`
-- **Restart application**: `forever restart server.js`
-- **View Apache logs**: `sudo tail -f /opt/bitnami/apache/logs/error_log`
-- **Restart Apache**: `sudo /opt/bitnami/ctlscript.sh restart apache` 
+When SSH'd into your Raspberry Pi:
+- **View running processes**: `pm2 list`
+- **Restart application**: `pm2 restart family-calendar`
+- **View application logs**: `pm2 logs family-calendar`
+- **Monitor application**: `pm2 monit` 
