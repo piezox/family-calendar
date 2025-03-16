@@ -44,130 +44,129 @@ A simple calendar application that integrates with Google Calendar API to displa
 
 ## Deployment to Raspberry Pi
 
-This project uses GitHub for source code management and includes scripts to automate the deployment process to a Raspberry Pi.
+This project uses GitHub for source code management and deployment to a Raspberry Pi.
 
-### 1. Push Your Code to GitHub
+### 1. Repository Information
 
-First, create a GitHub repository and push your code:
+This project is hosted at: https://github.com/piezox/family-calendar.git
 
+If you haven't already, clone the repository to your development machine:
 ```bash
-# Initialize Git repository (if not already done)
-git init
-
-# Add all files
-git add .
-
-# Commit changes
-git commit -m "Initial commit"
-
-# Add GitHub remote (replace with your repository URL)
-git remote add origin https://github.com/yourusername/family-calendar.git
-
-# Push to GitHub
-git push -u origin main
+git clone https://github.com/piezox/family-calendar.git
+cd family-calendar
 ```
 
 ### 2. Set Up Your Raspberry Pi
 
 1. **Set up SSH access** to your Raspberry Pi from your Mac
-2. **Transfer the setup script** to your Raspberry Pi:
+
+2. **Clone and run the setup script**:
    ```bash
-   scp pi-setup.sh pi@raspberrypi.local:~/
+   # Connect to your Pi
+   ssh pi@raspberrypi.local
+
+   # Clone the repository
+   git clone https://github.com/piezox/family-calendar.git
+   cd family-calendar
+
+   # Make the setup script executable and run it
+   chmod +x pi-setup.sh && ./pi-setup.sh
    ```
 
-3. **Run the setup script** on your Raspberry Pi:
-   ```bash
-   ssh pi@raspberrypi.local "chmod +x ~/pi-setup.sh && ~/pi-setup.sh"
-   ```
-
-   This will:
+   This script will automatically:
    - Install Node.js 20.x
    - Install Git and PM2
-   - Set up Nginx as a reverse proxy with proper configuration
+   - Set up Nginx as a reverse proxy
    - Configure the application to start on boot
+   - Set up PM2 for process management
 
-### 3. Deploy Your Application
+### 3. Configure Your Application
 
-#### Option 1: Manual Deployment
-
-1. **Transfer the deployment script** to your Raspberry Pi:
+1. **Set up environment variables**:
    ```bash
-   scp deploy-from-github.sh pi@raspberrypi.local:~/
+   # Create and edit .env file
+   nano .env
    ```
 
-2. **Update the GitHub repository URL** in the deployment script:
-   ```bash
-   ssh pi@raspberrypi.local "sed -i 's|https://github.com/yourusername/family-calendar.git|https://github.com/YOUR_ACTUAL_USERNAME/family-calendar.git|g' ~/deploy-from-github.sh"
+   Add your environment variables:
+   ```
+   PORT=3000
+   CLIENT_ID=your_client_id_here
+   CLIENT_SECRET=your_client_secret_here
+   REDIRECT_URI=http://raspberrypi.local/auth/callback
+   CALENDAR_ID=your_calendar_id_here
+   NODE_ENV=production
    ```
 
-3. **Run the deployment script** on your Raspberry Pi:
+2. **Start the application**:
    ```bash
-   ssh pi@raspberrypi.local "chmod +x ~/deploy-from-github.sh && ~/deploy-from-github.sh"
+   # Install dependencies and start
+   npm install --production
+   pm2 start server.js --name family-calendar
    ```
 
-#### Option 2: Automatic Deployment with GitHub Webhooks
-
-1. **Transfer the webhook setup script** to your Raspberry Pi:
+3. **Set up kiosk mode** (optional):
+   If you want the calendar to automatically start in full-screen mode when the Raspberry Pi boots:
    ```bash
-   scp setup-webhook.sh pi@raspberrypi.local:~/
+   # Make the script executable and run it
+   chmod +x setup-kiosk.sh && ./setup-kiosk.sh
    ```
 
-2. **Run the webhook setup script** on your Raspberry Pi:
-   ```bash
-   ssh pi@raspberrypi.local "chmod +x ~/setup-webhook.sh && ~/setup-webhook.sh"
-   ```
+   This script will:
+   - Install Chromium browser if needed
+   - Configure autostart for kiosk mode
+   - Disable screen blanking and cursor
+   - Set up full-screen mode
 
-3. **Configure the GitHub webhook** using the information provided by the script
+   After running this script, the calendar will automatically launch in full-screen mode on next boot.
 
-### 4. Set Up Environment Variables
-
-SSH into your Raspberry Pi and create a `.env` file:
-
-```bash
-ssh pi@raspberrypi.local
-cd ~/family-calendar
-nano .env
-```
-
-Add your environment variables:
-
-```
-PORT=3000
-CLIENT_ID=your_client_id_here
-CLIENT_SECRET=your_client_secret_here
-REDIRECT_URI=http://raspberrypi.local/auth/callback
-CALENDAR_ID=your_calendar_id_here
-NODE_ENV=production
-```
-
-### 5. Access Your Application
+### 4. Access Your Application
 
 You can now access your application at:
 - `http://raspberrypi.local` (if your Pi's hostname is "raspberrypi")
 - `http://your-raspberry-pi-ip` (using the Pi's IP address)
 
-### 6. Update Your Application
+### 5. Update Your Application
 
-With the GitHub-based deployment:
+To update your application with the latest changes:
 
-1. Make changes to your code locally
-2. Commit and push to GitHub:
+1. **Push your changes** to GitHub from your development machine:
    ```bash
    git add .
    git commit -m "Your update message"
    git push
    ```
 
-3. If you set up the webhook, the application will deploy automatically
-4. If not, run the deployment script on your Raspberry Pi:
+2. **Pull and restart** on your Raspberry Pi:
    ```bash
-   ssh pi@raspberrypi.local "~/deploy-from-github.sh"
+   # Connect to your Pi
+   ssh pi@raspberrypi.local
+
+   # Make sure you're in the correct directory
+   cd ~/family-calendar    # This is important! The repository must exist here
+
+   # Check if you're in a git repository (should show the branch name)
+   git status
+
+   # If the repository doesn't exist, clone it first:
+   # cd ~
+   # git clone https://github.com/piezox/family-calendar.git
+   # cd family-calendar
+
+   # Pull the latest changes
+   git pull
+
+   # Install any new dependencies
+   npm install --production
+
+   # Restart the application
+   pm2 restart family-calendar
    ```
 
 ### Useful Commands
 
 When SSH'd into your Raspberry Pi:
 - **View running processes**: `pm2 list`
-- **Restart application**: `pm2 restart family-calendar`
 - **View application logs**: `pm2 logs family-calendar`
-- **Monitor application**: `pm2 monit` 
+- **Monitor application**: `pm2 monit`
+- **View Nginx logs**: `sudo tail -f /var/log/nginx/error.log` 
