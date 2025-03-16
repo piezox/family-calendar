@@ -27,7 +27,7 @@ print_error() {
 
 # Configuration
 APP_DIR="$HOME/family-calendar"
-GITHUB_REPO="https://github.com/yourusername/family-calendar.git"  # Change this to your GitHub repository URL
+GITHUB_REPO="https://github.com/piezox/family-calendar.git" 
 APP_NAME="family-calendar"
 
 # Check if the application directory exists
