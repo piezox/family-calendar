@@ -120,6 +120,21 @@ cd family-calendar
 
    After running this script, the calendar will automatically launch in full-screen mode on next boot.
 
+   **To exit kiosk mode**:
+   - Press `Alt + F4` to close Chromium
+   - Or press `Ctrl + Alt + T` to open a terminal, then run:
+     ```bash
+     pkill chromium
+     ```
+   - To temporarily disable kiosk mode from starting at boot:
+     ```bash
+     mv ~/.config/autostart/calendar-kiosk.desktop ~/.config/autostart/calendar-kiosk.desktop.disabled
+     ```
+   - To re-enable kiosk mode:
+     ```bash
+     mv ~/.config/autostart/calendar-kiosk.desktop.disabled ~/.config/autostart/calendar-kiosk.desktop
+     ```
+
 ### 4. Access Your Application
 
 You can now access your application at:

@@ -6,6 +6,7 @@
 # 2. Installs PM2 for process management
 # 3. Sets up Nginx as a reverse proxy with proper configuration
 # 4. Configures the application to start on boot
+# 5. Sets up kiosk mode (optional)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -24,6 +25,19 @@ print_success() {
 
 print_error() {
   echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to prompt for yes/no confirmation
+confirm() {
+    read -r -p "${1:-Are you sure?} [y/N] " response
+    case "$response" in
+        [yY][eE][sS]|[yY]) 
+            true
+            ;;
+        *)
+            false
+            ;;
+    esac
 }
 
 # Update package lists
@@ -154,9 +168,71 @@ print_status "Configuring PM2 to start on boot..."
 pm2 startup | grep "sudo" | bash
 pm2 save
 
+# Ask if user wants to set up kiosk mode
+if confirm "Would you like to set up kiosk mode (auto-start in full screen)?"; then
+    print_status "Setting up kiosk mode..."
+
+    # Install Chromium browser if not already installed
+    print_status "Checking for Chromium browser..."
+    if ! command -v chromium-browser &> /dev/null; then
+        print_status "Installing Chromium browser..."
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser
+        print_success "Chromium browser installed successfully."
+    else
+        print_status "Chromium browser is already installed."
+    fi
+
+    # Create autostart directory
+    print_status "Creating autostart directory..."
+    mkdir -p ~/.config/autostart
+
+    # Create desktop entry for kiosk mode
+    print_status "Creating kiosk mode desktop entry..."
+    cat > ~/.config/autostart/calendar-kiosk.desktop << EOL
+[Desktop Entry]
+Type=Application
+Name=Family Calendar
+Exec=chromium-browser --kiosk --no-first-run --disable-infobars --noerrdialogs --disable-translate --disable-features=TranslateUI --disable-sync --disable-suggestions-service http://raspberrypi.local
+X-GNOME-Autostart-enabled=true
+EOL
+
+    print_status "Setting correct permissions..."
+    chmod +x ~/.config/autostart/calendar-kiosk.desktop
+
+    # Disable screen saver and screen blanking
+    print_status "Disabling screen saver and screen blanking..."
+    if ! grep -q "xserver-command=X -s 0 -dpms" /etc/lightdm/lightdm.conf 2>/dev/null; then
+        sudo sed -i '/^\[Seat:\*\]/a xserver-command=X -s 0 -dpms' /etc/lightdm/lightdm.conf
+    fi
+
+    # Disable cursor
+    print_status "Creating script to hide cursor..."
+    cat > ~/.config/autostart/hide-cursor.desktop << EOL
+[Desktop Entry]
+Type=Application
+Name=Hide Cursor
+Exec=unclutter -idle 0
+X-GNOME-Autostart-enabled=true
+EOL
+
+    # Install unclutter if not present
+    if ! command -v unclutter &> /dev/null; then
+        print_status "Installing unclutter to hide cursor..."
+        sudo apt-get install -y unclutter
+    fi
+
+    print_success "Kiosk mode setup completed successfully!"
+    print_status "The Family Calendar will start in kiosk mode on next boot."
+    print_status "To exit kiosk mode:"
+    print_status "- Press Alt + F4 to close Chromium"
+    print_status "- Or press Ctrl + Alt + T to open a terminal and run: pkill chromium"
+    print_status "- To disable kiosk mode: mv ~/.config/autostart/calendar-kiosk.desktop ~/.config/autostart/calendar-kiosk.desktop.disabled"
+fi
+
 print_success "Raspberry Pi setup completed successfully!"
 print_status "Next steps:"
-print_status "1. Clone your GitHub repository: git clone https://github.com/yourusername/family-calendar.git ~/family-calendar"
+print_status "1. Clone your GitHub repository: git clone https://github.com/piezox/family-calendar.git ~/family-calendar"
 print_status "2. Create a .env file in ~/family-calendar with your Google API credentials"
 print_status "3. Start your application: cd ~/family-calendar && pm2 start server.js --name family-calendar"
 print_status "4. Access your application at http://raspberrypi.local or http://$(hostname -I | awk '{print $1}')" 
